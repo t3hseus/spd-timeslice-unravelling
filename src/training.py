@@ -70,7 +70,7 @@ class TripletTracksEmbedder(pl.LightningModule):
         self.log_dict(
             {
                 "train_loss": loss,
-                "n_triplets": self.triplet_miner.num_triplets
+                "train_triplets": self.triplet_miner.num_triplets
             },
             prog_bar=True
         )
@@ -86,7 +86,7 @@ class TripletTracksEmbedder(pl.LightningModule):
         self.log_dict(
             {
                 "val_loss": loss,
-                "n_triplets": self.triplet_miner.num_triplets
+                "val_triplets": self.triplet_miner.num_triplets
             },
             prog_bar=True
         )
