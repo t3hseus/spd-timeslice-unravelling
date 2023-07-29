@@ -1,5 +1,5 @@
 # import is needed for gin config
-from src.training import TripletTracksEmbedder
+from src.training import TripletTracksEmbedder, TripletType, DistanceType
 from src.dataset import time_slice_collator, SPDTimesliceTracksDataset
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
@@ -43,6 +43,9 @@ def experiment(
         test_samples: int = 10,
         detector_efficiency: float = 1.0,
         learning_rate: float = 0.0001,
+        triplet_margin: float = 0.2,
+        type_of_triplets: TripletType = "semihard",
+        distance: DistanceType = DistanceType.cosine_similarity,
         # path to checkpoint to resume
         resume_from_checkpoint: Optional[str] = None,
 ):
@@ -92,7 +95,10 @@ def experiment(
     LOGGER.info('Creating model for training')
     tracks_embedder = TripletTracksEmbedder(
         model=model,
-        learning_rate=learning_rate
+        learning_rate=learning_rate,
+        triplet_margin=triplet_margin,
+        type_of_triplets=type_of_triplets,
+        distance=distance
     )
     LOGGER.info(tracks_embedder)
 

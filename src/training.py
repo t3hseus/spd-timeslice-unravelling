@@ -20,12 +20,18 @@ class TripletType(str, Enum):
     easy = "easy"
 
 
+class DistanceType(str, Enum):
+    cosine_similarity = "CosineSimilarity"
+    euclidean_distance = "LpDistance"
+
+
 class TripletTracksEmbedder(pl.LightningModule):
     def __init__(
         self,
         model: nn.Module,
         triplet_margin: float = 0.2,
         type_of_triplets: TripletType = "semihard",
+        distance: DistanceType = DistanceType.cosine_similarity,
         learning_rate: float = 1e-4,
         umapper: Optional[UMAP] = None
     ):
@@ -38,7 +44,7 @@ class TripletTracksEmbedder(pl.LightningModule):
         self.umapper = umapper
 
         self.model = model
-        self._distance = distances.CosineSimilarity()
+        self._distance = getattr(distances, distance)()
         self.criterion = losses.TripletMarginLoss(
             margin=triplet_margin,
             distance=self._distance,
