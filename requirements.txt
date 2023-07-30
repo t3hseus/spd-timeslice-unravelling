@@ -9,3 +9,5 @@ tensorboard
 matplotlib
 pandas
 plotly
+nbformat
+ipython

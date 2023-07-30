@@ -2,14 +2,17 @@ import io
 import numpy as np
 import plotly.graph_objects as go
 import matplotlib.pyplot as plt
-from typing import Optional, Any
+from typing import Optional, Any, Tuple
 from cycler import cycler
 
 
 def draw_events(
     hits: np.ndarray[(Any, 3), np.float32],
     labels: np.ndarray[Any, np.int32],
-    fakes: Optional[np.ndarray[(Any, 3), np.float32]] = None
+    fakes: Optional[np.ndarray[(Any, 3), np.float32]] = None,
+    x_coord_range: Tuple[float, float] = (-851., 851.),
+    y_coord_range: Tuple[float, float] = (-851., 851.),
+    z_coord_range: Tuple[float, float] = (-2386., 2386.)
 ) -> go.Figure:
     fig = go.Figure(data=go.Scatter3d(
         x=hits[:, 0],
@@ -45,9 +48,9 @@ def draw_events(
             r=10
         ),
         scene=dict(
-            xaxis=dict(range=[-851., 851.]),
-            yaxis=dict(range=[-851., 851.]),
-            zaxis=dict(range=[-2386., 2386.]),
+            xaxis=dict(range=x_coord_range),
+            yaxis=dict(range=y_coord_range),
+            zaxis=dict(range=z_coord_range),
             aspectmode='manual',
             aspectratio=dict(x=1, y=1, z=1),
         ),
