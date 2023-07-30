@@ -33,9 +33,8 @@ class SPDTimesliceTracksDataset(Dataset):
         np.random.seed(self._initial_seed + idx)
         # generate sample
         time_slice = self.spd_gen.generate_time_slice()
-        uniq_track_ids, uniq_track_ids_counts = np.unique(
+        _, uniq_track_ids_counts = np.unique(
             time_slice["track_ids"], return_counts=True)
-        n_tracks = uniq_track_ids.size
         # split hits array by tracks and convert to tensors
         tracks_by_hits = torch.split(
             torch.tensor(time_slice["hits"]).reshape(-1),
@@ -47,3 +46,4 @@ class SPDTimesliceTracksDataset(Dataset):
         labels = torch.tensor(
             time_slice["event_ids"][np.cumsum(uniq_track_ids_counts)-1])
         return tracks, labels
+

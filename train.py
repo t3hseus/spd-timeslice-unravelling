@@ -46,6 +46,8 @@ def experiment(
         triplet_margin: float = 0.2,
         type_of_triplets: TripletType = "semihard",
         distance: DistanceType = DistanceType.cosine_similarity,
+        num_workers: int = 0,
+        pin_memory: bool = False,
         # path to checkpoint to resume
         resume_from_checkpoint: Optional[str] = None,
 ):
@@ -81,15 +83,16 @@ def experiment(
         batch_size=BATCH_SIZE,
         shuffle=True,
         collate_fn=time_slice_collator,
-        # better works with one worker
-        # and no problems with determinism
-        # num_workers=2
+        num_workers=num_workers,
+        pin_memory=pin_memory
     )
     test_loader = DataLoader(
         test_data,
         batch_size=BATCH_SIZE,
         shuffle=False,
         collate_fn=time_slice_collator,
+        num_workers=num_workers,
+        pin_memory=pin_memory
     )
 
     LOGGER.info('Creating model for training')
