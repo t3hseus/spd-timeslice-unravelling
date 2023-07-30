@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+from typing import Optional, Callable
 from torch.utils.data import Dataset
 from torch.nn.utils.rnn import pad_sequence
 from .data_generation import SPDEventGenerator
@@ -15,6 +16,7 @@ class SPDTimesliceTracksDataset(Dataset):
         n_samples: int = 100,
         detector_eff: float = 0.98,
         n_events_timeslice: int = 40,
+        hits_normalizer: Optional[Callable] = None
     ):
         self.spd_gen = SPDEventGenerator(
             n_events_timeslice=n_events_timeslice,
@@ -22,6 +24,7 @@ class SPDTimesliceTracksDataset(Dataset):
             add_fakes=False
         )
         self._n_samples = n_samples
+        self.hits_normalizer = hits_normalizer
         # get initial random seed for reproducibility
         self._initial_seed = np.random.get_state()[1][0]
 
@@ -35,6 +38,10 @@ class SPDTimesliceTracksDataset(Dataset):
         time_slice = self.spd_gen.generate_time_slice()
         _, uniq_track_ids_counts = np.unique(
             time_slice["track_ids"], return_counts=True)
+        
+        if self.hits_normalizer:
+            time_slice["hits"] = self.hits_normalizer(time_slice["hits"])
+
         # split hits array by tracks and convert to tensors
         tracks_by_hits = torch.split(
             torch.tensor(time_slice["hits"]).reshape(-1),

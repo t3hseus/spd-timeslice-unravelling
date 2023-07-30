@@ -1,19 +1,27 @@
-# import is needed for gin config
-from src.training import TripletTracksEmbedder, TripletType, DistanceType
-from src.dataset import time_slice_collator, SPDTimesliceTracksDataset
-from pytorch_lightning.callbacks import ModelCheckpoint
-from pytorch_lightning.loggers import TensorBoardLogger
-from torch.utils.data import DataLoader
-from torch import nn
-from absl import app
-from absl import flags
-from typing import Optional
+import warnings
+warnings.filterwarnings("ignore", message=".*The 'nopython' keyword.*")
+
 import os
 import gin
 import logging
 import pytorch_lightning as pl
+
+from torch import nn
+from absl import app
+from absl import flags
+from typing import Optional, Callable
+
+from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.loggers import TensorBoardLogger
+from torch.utils.data import DataLoader
+
 from src.logging_utils import setup_logger
-from src.model import TrackEmbedder
+from src.training import TripletTracksEmbedder, TripletType, DistanceType
+from src.dataset import time_slice_collator, SPDTimesliceTracksDataset
+
+# these imports are needed for gin config
+from src.model import TrackEmbedder 
+from src.transformations import ConstraintsNormalizer
 
 
 FLAGS = flags.FLAGS
@@ -44,8 +52,9 @@ def experiment(
         detector_efficiency: float = 1.0,
         learning_rate: float = 0.0001,
         triplet_margin: float = 0.2,
-        type_of_triplets: TripletType = "semihard",
+        type_of_triplets: TripletType = TripletType.semihard,
         distance: DistanceType = DistanceType.cosine_similarity,
+        hits_normalizer: Optional[Callable] = None,
         num_workers: int = 0,
         pin_memory: bool = False,
         # path to checkpoint to resume
@@ -74,9 +83,15 @@ def experiment(
 
     LOGGER.info("Preparing datasets for training and validation")
     train_data = SPDTimesliceTracksDataset(
-        n_samples=train_samples, detector_eff=detector_efficiency)
+        n_samples=train_samples, 
+        detector_eff=detector_efficiency, 
+        hits_normalizer=hits_normalizer
+    )
     test_data = SPDTimesliceTracksDataset(
-        n_samples=test_samples, detector_eff=detector_efficiency)
+        n_samples=test_samples, 
+        detector_eff=detector_efficiency, 
+        hits_normalizer=hits_normalizer
+    )
 
     train_loader = DataLoader(
         train_data,

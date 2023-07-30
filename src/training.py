@@ -1,5 +1,7 @@
-import pytorch_lightning as pl
+import gin
 import torch
+import pytorch_lightning as pl
+
 from torch import nn
 from enum import Enum
 from typing import Optional
@@ -14,12 +16,15 @@ from pytorch_metric_learning import (
 from .visualization import draw_embeddings
 
 
+@gin.constants_from_enum
 class TripletType(str, Enum):
     all = "all"
     semihard = "semihard"
+    hard = "hard"
     easy = "easy"
 
 
+@gin.constants_from_enum
 class DistanceType(str, Enum):
     cosine_similarity = "CosineSimilarity"
     euclidean_distance = "LpDistance"
@@ -76,7 +81,7 @@ class TripletTracksEmbedder(pl.LightningModule):
         self.log_dict(
             {
                 "train_loss": loss,
-                "train_triplets": self.triplet_miner.num_triplets
+                "train_triplets": float(self.triplet_miner.num_triplets)
             },
             prog_bar=True
         )
@@ -92,7 +97,7 @@ class TripletTracksEmbedder(pl.LightningModule):
         self.log_dict(
             {
                 "val_loss": loss,
-                "val_triplets": self.triplet_miner.num_triplets
+                "val_triplets": float(self.triplet_miner.num_triplets)
             },
             prog_bar=True
         )
