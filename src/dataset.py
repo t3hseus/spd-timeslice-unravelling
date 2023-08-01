@@ -1,9 +1,15 @@
 import numpy as np
 import torch
+from enum import IntEnum
 from typing import Optional, Callable
 from torch.utils.data import Dataset
 from torch.nn.utils.rnn import pad_sequence
 from .data_generation import SPDEventGenerator
+
+
+class DatasetMode(IntEnum):
+    train = 0
+    test = 1
 
 
 def time_slice_collator(x):
@@ -16,7 +22,8 @@ class SPDTimesliceTracksDataset(Dataset):
         n_samples: int = 100,
         detector_eff: float = 0.98,
         n_events_timeslice: int = 40,
-        hits_normalizer: Optional[Callable] = None
+        hits_normalizer: Optional[Callable] = None,
+        mode: DatasetMode = DatasetMode.train
     ):
         self.spd_gen = SPDEventGenerator(
             n_events_timeslice=n_events_timeslice,
@@ -26,7 +33,8 @@ class SPDTimesliceTracksDataset(Dataset):
         self._n_samples = n_samples
         self.hits_normalizer = hits_normalizer
         # get initial random seed for reproducibility
-        self._initial_seed = np.random.get_state()[1][0]
+        # mode helps to ensure that datasets don't intersect
+        self._initial_seed = np.random.get_state()[1][mode]
 
     def __len__(self) -> int:
         return self._n_samples

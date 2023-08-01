@@ -112,7 +112,7 @@ class SPDEventGenerator:
         theta = np.arccos(np.random.uniform(-1, 1))
         charge = np.random.choice([-1, 1])
 
-        for i, r in enumerate(radii):
+        for _, r in enumerate(radii):
             x, y, z, px, py, pz = self.extrapolate_to_r(
                 pt, charge, theta, phi, vz, r)
 
@@ -131,6 +131,10 @@ class SPDEventGenerator:
             if np.random.uniform(0, 1) < detector_eff:
                 hits.append([x, y, z])
                 momentums.append([px, py, pz])
+            else:
+                # add zeros for missing hit
+                hits.append([0, 0, 0])
+                momentums.append([0, 0, 0])
 
         hits = np.asarray(hits, dtype=np.float32)
         momentums = np.asarray(momentums, dtype=np.float32)
@@ -197,6 +201,7 @@ class SPDEventGenerator:
             track_ids.append(np.full(len(track_hits), track))
 
         hits = np.vstack(hits)
+        missing_hits_mask = ~hits.any(axis=1)
         momentums = np.vstack(momentums)
         track_ids = np.concatenate(track_ids)
 
@@ -208,6 +213,7 @@ class SPDEventGenerator:
 
         return {
             "hits": hits,
+            "missing_hits_mask": missing_hits_mask,
             "momentums": momentums,
             "track_ids": track_ids,
             "fakes": fakes
@@ -250,6 +256,7 @@ class SPDEventGenerator:
             n_gen_tracks += np.unique(event["track_ids"]).size
 
         hits = np.vstack(hits)
+        missing_hits_mask = ~hits.any(axis=1)
         momentums = np.vstack(momentums)
         track_ids = np.concatenate(track_ids)
         event_ids = np.concatenate(event_ids)
@@ -257,6 +264,7 @@ class SPDEventGenerator:
 
         return {
             "hits": hits,
+            "missing_hits_mask": missing_hits_mask,
             "momentums": momentums,
             "track_ids": track_ids,
             "event_ids": event_ids,
