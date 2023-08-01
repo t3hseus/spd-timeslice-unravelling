@@ -40,6 +40,7 @@ class TripletTracksEmbedder(pl.LightningModule):
         type_of_triplets: TripletType = "semihard",
         distance: DistanceType = DistanceType.cosine_similarity,
         learning_rate: float = 1e-4,
+        weight_decay: float = 1e-2, # default AdamW param
         umapper: Optional[UMAP] = None
     ):
         super().__init__()
@@ -58,6 +59,7 @@ class TripletTracksEmbedder(pl.LightningModule):
             reducer=reducers.ThresholdReducer(low=0)
         )
         self.learning_rate = learning_rate
+        self.weight_decay = weight_decay
         self.triplet_miner = miners.TripletMarginMiner(
             margin=triplet_margin,
             type_of_triplets=type_of_triplets,
@@ -121,5 +123,9 @@ class TripletTracksEmbedder(pl.LightningModule):
         self.validation_step_outputs.clear()  # free memory
 
     def configure_optimizers(self):
-        optimizer = torch.optim.AdamW(self.parameters(), lr=self.learning_rate)
+        optimizer = torch.optim.AdamW(
+            self.parameters(), 
+            lr=self.learning_rate,
+            weight_decay=self.weight_decay
+        )
         return optimizer
