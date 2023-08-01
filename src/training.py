@@ -28,6 +28,8 @@ class TripletType(str, Enum):
 class DistanceType(str, Enum):
     cosine_similarity = "CosineSimilarity"
     euclidean_distance = "LpDistance"
+    dot_product = "DotProductSimilarity"
+    snr_distance = "SNRDistance"
 
 
 class TripletTracksEmbedder(pl.LightningModule):
