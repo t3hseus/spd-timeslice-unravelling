@@ -1,11 +1,12 @@
 import gin
-import torch
-import pytorch_lightning as pl
+import importlib
 
+import torch
 from torch import nn
 from enum import Enum
-from typing import Optional
 from umap import UMAP
+
+import pytorch_lightning as pl
 from pytorch_metric_learning import (
     distances,
     reducers,
@@ -13,13 +14,60 @@ from pytorch_metric_learning import (
     miners,
 )
 
-from sklearn.base import ClusterMixin
+import numpy as np
 from sklearn.cluster import KMeans
 
-from typing import Type, Any, Dict
+from collections import defaultdict
+from typing import Optional, Type, Any, Dict
 
-from .metrics import ClusterMetric, Clustering
+from .metrics import *
 from .visualization import draw_embeddings
+
+
+@gin.configurable(allowlist=None)
+def clustering_algorithm(module: str, class_: str, **kwargs: dict):
+    module = importlib.import_module(module)
+    cls = getattr(module, class_)
+    return cls(**kwargs)
+
+class Clustering:
+    def __init__(self, clustering_algorithm):
+        self.clustering_algorithm = clustering_algorithm
+
+    def compute_clusters(self, embeddings: np.ndarray):
+        cluster_assignments = self.clustering_algorithm.fit_predict(embeddings)
+        return cluster_assignments
+
+    def link_clusters(self, cluster_assignments: np.ndarray, labels: np.ndarray):
+
+        labels_dict = defaultdict(set)
+        cluster_dict = defaultdict(set)
+
+        # add indices to sets for each label
+        for i, val in enumerate(labels.tolist()):
+            labels_dict[val].add(i)
+
+        for i, val in enumerate(cluster_assignments.tolist()):
+            cluster_dict[val].add(i)
+
+        # calculate intersections and link clusters and events
+        cluster_evt_dict = {}
+        for cluster, cluster_set in cluster_dict.items():
+            max_intersect = 0
+            max_evt = None
+            for evt, evt_set in labels_dict.items():
+                intersect = len(cluster_set & evt_set)
+                if intersect > max_intersect:
+                    max_intersect = intersect
+                    max_evt = evt
+            cluster_evt_dict[cluster] = max_evt
+
+        vfunc = np.vectorize(cluster_evt_dict.get)
+        return vfunc(cluster_assignments)
+
+    def cluster_and_link(self, embeddings: np.ndarray, labels: np.ndarray):
+        cluster_assignments = self.compute_clusters(embeddings)
+        return self.link_clusters(cluster_assignments, labels)
 
 
 @gin.constants_from_enum
@@ -49,6 +97,7 @@ class TripletTracksEmbedder(pl.LightningModule):
         weight_decay: float = 1e-2, # default AdamW param
         umapper: Optional[UMAP] = None,
         clustering_algorithm: Optional[Any] = None,
+        metrics: Optional[list] = None,
     ):
         super().__init__()
         self.save_hyperparameters(ignore=['model', 'umapper', 'clustering_algorithm'])
@@ -70,8 +119,7 @@ class TripletTracksEmbedder(pl.LightningModule):
             clustering_algorithm = KMeans(n_clusters=40, random_state=42, n_init=10)
         self.clustering = Clustering(clustering_algorithm)
 
-        self.cluster_metric = ClusterMetric()
-
+        self.metrics = metrics
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
         self.triplet_miner = miners.TripletMarginMiner(
@@ -80,6 +128,8 @@ class TripletTracksEmbedder(pl.LightningModule):
             distance=self._distance
         )
         self.validation_step_outputs = []
+
+        self.epoch_metrics = defaultdict(list)
 
     def forward(self, inputs):
         return self.model(inputs)
@@ -107,17 +157,25 @@ class TripletTracksEmbedder(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         loss, embeddings = self._forward_batch(batch, return_embeddings=True)
-
         emb_np = embeddings.cpu().detach().numpy()
         evt_ids_np = batch[1].cpu().numpy()
+        cluster_preds = self.clustering.cluster_and_link(emb_np, evt_ids_np)
 
-        cluster_preds = self.clustering(embeddings, batch[1])
-        metrics = self.cluster_metric(embeddings, batch[1], cluster_preds)
+        metrics_results = {}
+
+        for metric in self.metrics:
+            if isinstance(metric, (F1ScoreMetric, PrecisionScoreMetric, RecallScoreMetric, AccuracyScoreMetric)):
+                metric.update(evt_ids_np, cluster_preds)
+            elif isinstance(metric, BaseScoreMetric):
+                metric.update(emb_np, cluster_preds)
+
+            metric_name = type(metric).__name__
+            self.epoch_metrics[metric_name].append(metric.compute())
 
         self.validation_step_outputs.append({
             "embeddings": emb_np,
             "event_ids": evt_ids_np,
-            "metrics": metrics
+            "metrics": metrics_results
         })
         self.log_dict(
             {
@@ -132,6 +190,9 @@ class TripletTracksEmbedder(pl.LightningModule):
         sample_idx = 0
         sample_for_visualization = self.validation_step_outputs[sample_idx]
 
+        avg_metrics = {name: torch.mean(torch.tensor(values)) for name, values in self.epoch_metrics.items()}
+        self.epoch_metrics.clear()
+
         umap_embeddings = self.umapper.fit_transform(
             sample_for_visualization["embeddings"]
         )
@@ -143,16 +204,12 @@ class TripletTracksEmbedder(pl.LightningModule):
             split_name="validation"
         )
 
-        avg_metrics = self.cluster_metric.compute()
-        self.cluster_metric.reset()
-        self.clustering.reset()
-
         self.logger.experiment.add_figure(
             "Embeddings visualization", plt_obj.gcf(), self.current_epoch
         )
 
         for metric, value in avg_metrics.items():
-            self.logger.experiment.add_scalar(f'avg_{metric}', value, self.current_epoch)
+            self.logger.experiment.add_scalar(f'{metric}', value, self.current_epoch)
 
         self.validation_step_outputs.clear()  # free memory
 
