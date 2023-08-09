@@ -9,16 +9,16 @@ from sklearn.metrics import (
 class BaseScoreMetric(Metric):
     def __init__(self, score_func, **kwargs):
         super().__init__()
-        self.score = []
+        self.cumulative_score = []
         self.score_func = score_func
         self.score_func_kwargs = kwargs
 
     def update(self, *args, **kwargs):
-        self.score.append(self.score_func(*args, **kwargs, **self.score_func_kwargs))
+        self.cumulative_score.append(self.score_func(*args, **kwargs, **self.score_func_kwargs))
 
     def compute(self):
-        mean_score = sum(self.score) / len(self.score)
-        self.score = []
+        mean_score = sum(self.cumulative_score) / len(self.cumulative_score)
+        self.cumulative_score = []
         return mean_score
 
 @gin.configurable
