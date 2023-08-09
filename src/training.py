@@ -1,18 +1,27 @@
 import gin
-import torch
-import pytorch_lightning as pl
+import importlib
 
+import torch
 from torch import nn
 from enum import Enum
-from typing import Optional
 from umap import UMAP
+
+import pytorch_lightning as pl
 from pytorch_metric_learning import (
     distances,
     reducers,
     losses,
-    miners
+    miners,
 )
 
+import numpy as np
+from sklearn.cluster import KMeans
+
+from collections import defaultdict
+from typing import Optional, Type, Any, Dict
+
+from .metrics import *
+from .clustering import *
 from .visualization import draw_embeddings
 
 
@@ -41,10 +50,12 @@ class TripletTracksEmbedder(pl.LightningModule):
         distance: DistanceType = DistanceType.cosine_similarity,
         learning_rate: float = 1e-4,
         weight_decay: float = 1e-2, # default AdamW param
-        umapper: Optional[UMAP] = None
+        umapper: Optional[UMAP] = None,
+        clustering_algorithm: Optional[Any] = None,
+        metrics: Optional[list] = None,
     ):
         super().__init__()
-        self.save_hyperparameters(ignore=['model', 'umapper'])
+        self.save_hyperparameters(ignore=['model', 'umapper', 'clustering_algorithm'])
 
         if umapper is None:
             # configure default one
@@ -58,6 +69,13 @@ class TripletTracksEmbedder(pl.LightningModule):
             distance=self._distance,
             reducer=reducers.ThresholdReducer(low=0)
         )
+
+        if clustering_algorithm is None:
+            clustering_algorithm = KMeans(n_clusters=40, random_state=42, n_init=10)
+
+        self.clustering = Clustering(clustering_algorithm)
+
+        self.metrics = metrics
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
         self.triplet_miner = miners.TripletMarginMiner(
@@ -66,6 +84,8 @@ class TripletTracksEmbedder(pl.LightningModule):
             distance=self._distance
         )
         self.validation_step_outputs = []
+
+        self.epoch_metrics = defaultdict(list)
 
     def forward(self, inputs):
         return self.model(inputs)
@@ -93,15 +113,33 @@ class TripletTracksEmbedder(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         loss, embeddings = self._forward_batch(batch, return_embeddings=True)
-        # save predictions for visualization
+        emb_np = embeddings.cpu().detach().numpy()
+        evt_ids_np = batch[1].cpu().numpy()
+        cluster_preds = self.clustering.cluster_and_link(emb_np, evt_ids_np)
+
+        metrics_results = {}
+
+        for metric in self.metrics:
+            if isinstance(metric, (
+                F1ScoreMetric,
+                PrecisionScoreMetric,
+                RecallScoreMetric,
+                AccuracyScoreMetric
+            )):
+                metric.update(evt_ids_np, cluster_preds)
+            elif isinstance(metric, BaseScoreMetric):
+                metric.update(emb_np, cluster_preds)
+
         self.validation_step_outputs.append({
-            "embeddings": embeddings.cpu().numpy(),
-            "event_ids": batch[1].cpu().numpy()
+            "embeddings": emb_np,
+            "event_ids": evt_ids_np,
+            "metrics": metrics_results
         })
+
         self.log_dict(
             {
                 "val_loss": loss,
-                "val_triplets": float(self.triplet_miner.num_triplets)
+                "val_triplets": float(self.triplet_miner.num_triplets),
             },
             prog_bar=True
         )
@@ -110,21 +148,35 @@ class TripletTracksEmbedder(pl.LightningModule):
         # take first batch for validation
         sample_idx = 0
         sample_for_visualization = self.validation_step_outputs[sample_idx]
+
+        for metric in self.metrics:
+            metric_name = type(metric).__name__
+            self.logger.experiment.add_scalar(
+                f'{metric_name}',
+                metric.compute(),
+                self.current_epoch
+            )
+
         umap_embeddings = self.umapper.fit_transform(
-            sample_for_visualization["embeddings"])
+            sample_for_visualization["embeddings"]
+        )
+
         plt_obj = draw_embeddings(
             embeddings=umap_embeddings,
             labels=sample_for_visualization["event_ids"],
             sample_idx=sample_idx,
             split_name="validation"
         )
+
         self.logger.experiment.add_figure(
-            "Embeddings visualization", plt_obj.gcf(), self.current_epoch)
+            "Embeddings visualization", plt_obj.gcf(), self.current_epoch
+        )
+
         self.validation_step_outputs.clear()  # free memory
 
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(
-            self.parameters(), 
+            self.parameters(),
             lr=self.learning_rate,
             weight_decay=self.weight_decay
         )

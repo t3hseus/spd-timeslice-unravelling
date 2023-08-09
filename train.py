@@ -20,9 +20,9 @@ from src.training import TripletTracksEmbedder, TripletType, DistanceType
 from src.dataset import time_slice_collator, SPDTimesliceTracksDataset, DatasetMode
 
 # these imports are needed for gin config
-from src.model import TrackEmbedder 
+from src.model import TrackEmbedder
 from src.transformations import ConstraintsNormalizer
-
+from src.metrics import SilhouetteScoreMetric
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
@@ -60,6 +60,7 @@ def experiment(
         pin_memory: bool = False,
         # path to checkpoint to resume
         resume_from_checkpoint: Optional[str] = None,
+        metrics: list=[SilhouetteScoreMetric],
 ):
     os.makedirs(logging_dir, exist_ok=True)
     tb_logger = TensorBoardLogger(logging_dir, name=model.__class__.__name__)
@@ -84,14 +85,14 @@ def experiment(
 
     LOGGER.info("Preparing datasets for training and validation")
     train_data = SPDTimesliceTracksDataset(
-        n_samples=train_samples, 
-        detector_eff=detector_efficiency, 
+        n_samples=train_samples,
+        detector_eff=detector_efficiency,
         hits_normalizer=hits_normalizer,
         mode=DatasetMode.train
     )
     test_data = SPDTimesliceTracksDataset(
-        n_samples=test_samples, 
-        detector_eff=detector_efficiency, 
+        n_samples=test_samples,
+        detector_eff=detector_efficiency,
         hits_normalizer=hits_normalizer,
         mode=DatasetMode.test
     )
@@ -125,7 +126,8 @@ def experiment(
         weight_decay=weight_decay,
         triplet_margin=triplet_margin,
         type_of_triplets=type_of_triplets,
-        distance=distance
+        distance=distance,
+        metrics=metrics,
     )
     LOGGER.info(tracks_embedder)
 
