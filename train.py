@@ -94,7 +94,7 @@ def experiment(
         n_samples=test_samples,
         detector_eff=detector_efficiency,
         hits_normalizer=hits_normalizer,
-        mode=DatasetMode.test
+        mode=DatasetMode.val
     )
 
     # check both determinism and test != train
