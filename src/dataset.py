@@ -9,7 +9,8 @@ from .data_generation import SPDEventGenerator
 
 class DatasetMode(IntEnum):
     train = 0
-    test = 1
+    val = 1
+    test = 2
 
 
 def time_slice_collator(x):
@@ -46,7 +47,7 @@ class SPDTimesliceTracksDataset(Dataset):
         time_slice = self.spd_gen.generate_time_slice()
         _, uniq_track_ids_counts = np.unique(
             time_slice["track_ids"], return_counts=True)
-        
+
         if self.hits_normalizer:
             time_slice["hits"] = self.hits_normalizer(time_slice["hits"])
 
