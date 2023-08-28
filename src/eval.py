@@ -8,13 +8,15 @@ from src.dataset import time_slice_collator, SPDTimesliceTracksDataset, DatasetM
 from torch.utils.data import DataLoader
 from src.visualization import draw_embeddings
 from src.metrics import *
+import src.utils
 import matplotlib.pyplot as plt
-import time
+import pandas as pd
 import numpy as np
+import importlib
+from tqdm.auto import tqdm
+import time
 import gin
 import re
-import src.utils
-import importlib
 import os
 
 
@@ -94,7 +96,7 @@ class ModelEvaluator:
         clustering_times = []
         metrics_results = {}
 
-        for batch in self.data_loader:
+        for batch in tqdm(self.data_loader):
             tracks, evt_ids = batch
             start_time = time.time()
             embeddings = self.model(tracks)
@@ -128,6 +130,7 @@ class ModelEvaluator:
             metrics_results[metric_name] = metric_val
 
         results = {
+            'n_samples': self.n_samples,
             'avg_time': {
                 'emb_time': avg_embedding_time,
                 'cluster_time': avg_clustering_time
@@ -135,4 +138,7 @@ class ModelEvaluator:
             'metrics': metrics_results
         }
 
-        return results
+        df_time_res = pd.DataFrame({'emb_time': embedding_times, 'cluster_time': clustering_times})
+
+
+        return results, df_time_res.describe()
