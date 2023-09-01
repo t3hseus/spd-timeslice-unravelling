@@ -51,6 +51,13 @@ class TripletTracksEmbedder(pl.LightningModule):
         learning_rate: float = 1e-4,
         weight_decay: float = 1e-2, # default AdamW param
         umapper: Optional[UMAP] = None,
+        # TODO: Fix clustering algorithm param
+        # I am sure that it initializes as KMeans everytime by default
+        # to fix the issue, I propose to add clustering_model param 
+        # to the experiment (in train.py), so in the config will be a row:
+        # experiment.clustering_model = clustering_algorithm()
+        # also it is needed to import clustering_algorithm function in the train.py
+        # for the example see eval.py
         clustering_algorithm: Optional[Any] = None,
         metrics: Optional[list] = None,
     ):

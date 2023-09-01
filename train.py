@@ -6,23 +6,21 @@ import gin
 import logging
 import pytorch_lightning as pl
 
-from torch import nn
-from absl import app
 from absl import flags
+from absl import app
+from torch import nn
 from typing import Optional, Callable
-
-from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TensorBoardLogger
+from pytorch_lightning.callbacks import ModelCheckpoint
 from torch.utils.data import DataLoader
 
-from src.logging_utils import setup_logger
-from src.training import TripletTracksEmbedder, TripletType, DistanceType
-from src.dataset import time_slice_collator, SPDTimesliceTracksDataset, DatasetMode
-
-# these imports are needed for gin config
-from src.model import TrackEmbedder
-from src.transformations import ConstraintsNormalizer
 from src.metrics import SilhouetteScoreMetric
+from src.transformations import ConstraintsNormalizer
+from src.model import TrackEmbedder
+from src.dataset import time_slice_collator, SPDTimesliceTracksDataset, DatasetMode
+from src.training import TripletTracksEmbedder, TripletType, DistanceType
+from src.logging_utils import setup_logger
+
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string(
@@ -60,7 +58,7 @@ def experiment(
         pin_memory: bool = False,
         # path to checkpoint to resume
         resume_from_checkpoint: Optional[str] = None,
-        metrics: list=[SilhouetteScoreMetric],
+        metrics: list = [SilhouetteScoreMetric],
 ):
     os.makedirs(logging_dir, exist_ok=True)
     tb_logger = TensorBoardLogger(logging_dir, name=model.__class__.__name__)
@@ -144,7 +142,7 @@ def experiment(
     trainer.fit(
         model=tracks_embedder,
         train_dataloaders=train_loader,
-        val_dataloaders=test_loader
+        val_dataloaders=test_loader,
     )
 
 
