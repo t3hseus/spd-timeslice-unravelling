@@ -1,5 +1,5 @@
 # Evaluation script
-# Example of usage: 
+# Example of usage:
 # CUDA_VISIBLE_DEVICES=0 python eval.py --model_dir "path/to/logs/experiment_logs/TrackEmbedder/version_16" --device cuda
 
 import os
@@ -77,6 +77,9 @@ def experiment(
         pin_memory=pin_memory,
         device=device
     )
+
+    evaluator.visualize_embeddings()
+
     result = evaluator.evaluate(save_result=True)
     LOGGER.info(result)
     LOGGER.info("End of evaluation")
