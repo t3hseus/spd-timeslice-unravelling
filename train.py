@@ -20,6 +20,8 @@ from src.model import TrackEmbedder
 from src.dataset import time_slice_collator, SPDTimesliceTracksDataset, DatasetMode
 from src.training import TripletTracksEmbedder, TripletType, DistanceType
 from src.logging_utils import setup_logger
+from src.clustering import clustering_algorithm
+
 
 
 FLAGS = flags.FLAGS
@@ -126,6 +128,7 @@ def experiment(
         type_of_triplets=type_of_triplets,
         distance=distance,
         metrics=metrics,
+        clustering_algorithm=clustering_algorithm(),
     )
     LOGGER.info(tracks_embedder)
 
