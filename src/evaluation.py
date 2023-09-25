@@ -15,7 +15,7 @@ from typing import Optional, Any, Callable
 from src.clustering import Clustering
 from src.dataset import time_slice_collator, SPDTimesliceTracksDataset, DatasetMode
 from torch.utils.data import DataLoader
-from src.visualization import draw_embeddings
+from src.visualization import visualize_embeddings_eval
 from src.metrics import *
 from src.clustering import Clustering
 
@@ -77,11 +77,10 @@ class ModelEvaluator:
 
 
     def visualize_embeddings(self, num_samples=6):
+        fig, axes = plt.subplots(3, 2, figsize=(10, 10))
+        fig.suptitle(f'UMAP plots for {num_samples} random samples')
 
-        fig, axes = plt.subplots(2, 3, figsize=(15, 10))
-        fig.suptitle(f'UMAP plots for the first {num_samples} samples')
-
-        for i, batch in enumerate(self.data_loader):
+        for i, batch in enumerate(self.test_loader):
             if i >= num_samples:
                 break
 
@@ -89,16 +88,13 @@ class ModelEvaluator:
             embeddings = self.model(tracks).detach().numpy()
             evt_ids_np = evt_ids.detach().numpy()
 
-            ax = axes[i // 3, i % 3]
-            plt.sca(ax)
-
-            draw_embeddings(embeddings=embeddings,
-                            labels=evt_ids_np, sample_idx=i, split_name='')
+            ax = axes[i // 2, i % 2]
+            visualize_embeddings_eval(ax, embeddings=embeddings,
+                            labels=evt_ids_np, sample_idx=i, split_name='Test')
 
         plt.tight_layout()
         plt.subplots_adjust(top=0.90)
-        plt.savefig(os.path.join(self.base_path,
-                    self.run_name, "embeddings_subplot.png"))
+        plt.savefig(os.path.join(self.model_dir, "embeddings_subplot.png"))
 
 
     def evaluate(self, save_result=False):
