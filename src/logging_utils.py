@@ -2,9 +2,9 @@ import logging
 import os
 
 
-def setup_logger(logger, logger_dir):
+def setup_logger(logger, logger_dir, stage="train"):
     os.makedirs(logger_dir, exist_ok=True)
-    fh = logging.FileHandler('%s/train.log' % logger_dir)
+    fh = logging.FileHandler(f"{logger_dir}/{stage}.log")
 
     # create formatter
     formatter = logging.Formatter(

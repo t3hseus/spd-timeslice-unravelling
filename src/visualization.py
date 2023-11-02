@@ -1,4 +1,5 @@
 import io
+import os
 import numpy as np
 import plotly.graph_objects as go
 import matplotlib.pyplot as plt
@@ -85,3 +86,25 @@ def draw_embeddings(
     # plt.savefig(buf, format='png')
     # buf.seek(0)
     return plt
+
+
+def visualize_embeddings_eval(
+        ax,
+        embeddings: np.ndarray,
+        labels: np.ndarray,
+        sample_idx: int,
+        split_name: str
+):
+    label_set = np.unique(labels)
+    num_classes = len(label_set)
+    ax.set_prop_cycle(
+        cycler(
+            "color", [plt.cm.nipy_spectral(i)
+                      for i in np.linspace(0, 0.9, num_classes)]
+        )
+    )
+    for i in range(num_classes):
+        idx = labels == label_set[i]
+        ax.plot(embeddings[idx, 0], embeddings[idx, 1], ".", markersize=5)
+    ax.set_title(f"UMAP plot for the #{sample_idx} {split_name} sample")
+
