@@ -1,7 +1,6 @@
 
 import os
 import time
-import importlib
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -12,12 +11,11 @@ from glob import glob
 from torch import nn
 from typing import Optional, Any, Callable
 
-from src.clustering import Clustering
-from src.dataset import time_slice_collator, SPDTimesliceTracksDataset, DatasetMode
+from .clustering import Clustering
+from .dataset import time_slice_collator, SPDTimesliceTracksDataset, DatasetMode
 from torch.utils.data import DataLoader
-from src.visualization import visualize_embeddings_eval
-from src.metrics import *
-from src.clustering import Clustering
+from .visualization import visualize_embeddings_eval
+from .metrics import *
 
 
 BATCH_SIZE = 1
