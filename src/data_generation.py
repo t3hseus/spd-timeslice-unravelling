@@ -1,23 +1,27 @@
 import numpy as np
-import numpy.typing as npt
-from typing import Tuple, Optional, Any, TypedDict
+from typing import Tuple, Optional, Any
+from dataclasses import dataclass
 
 
-Event = TypedDict(
-    'Event', {
-        "hits": np.ndarray[(Any, 3), np.float32],
-        "momentums": np.ndarray[(Any, 3), np.float32],
-        "fakes": np.ndarray[(Any, 3), np.float32],
-        "track_ids": np.ndarray[Any, np.float32]}
-)
-TimeSlice = TypedDict(
-    'TimeSlice', {
-        "hits": np.ndarray[(Any, 3), np.float32],
-        "momentums": np.ndarray[(Any, 3), np.float32],
-        "fakes": np.ndarray[(Any, 3), np.float32],
-        "track_ids": np.ndarray[Any, np.float32],
-        "event_ids": np.ndarray[Any, np.float32]}
-)
+@dataclass
+class Event:
+    hits: np.ndarray[(Any, 3), np.float32]
+    momentums: np.ndarray[(Any, 3), np.float32]
+    fakes: np.ndarray[(Any, 3), np.float32]
+    track_ids: np.ndarray[Any, np.float32]
+    vertex: np.ndarray[(3,), np.float32]
+    missing_hits_mask: np.ndarray[Any, np.bool_]
+
+
+@dataclass
+class TimeSlice:
+    hits: np.ndarray[(Any, 3), np.float32]
+    momentums: np.ndarray[(Any, 3), np.float32]
+    fakes: np.ndarray[(Any, 3), np.float32]
+    track_ids: np.ndarray[Any, np.float32]
+    event_ids: np.ndarray[Any, np.float32]
+    vertices: np.ndarray[(Any, 3), np.float32]
+    missing_hits_mask: np.ndarray[Any, np.bool_]
 
 
 class SPDEventGenerator:
@@ -55,22 +59,26 @@ class SPDEventGenerator:
         charge: int,
         theta: float,
         phi: float,
-        z0: float,
+        vx: float,
+        vy: float,
+        vz: float,
         Rc: float
     ) -> Tuple[float, float, float, float, float, float]:
-        deg = 180 / np.pi
+
         pz = pt / np.tan(theta) * charge
         phit = phi - np.pi / 2
         R = pt / 0.29 / self.magnetic_field  # mm
         k0 = R / np.tan(theta)
-        x0 = R * np.cos(phit)
-        y0 = R * np.sin(phit)
+        x0 = vx + R * np.cos(phit)
+        y0 = vy + R * np.sin(phit)
 
-        if R < Rc / 2:  # no intersection
+        Rtmp = Rc - np.sqrt(vx*vx + vy*vy)
+
+        if R < Rtmp / 2:  # no intersection
             return (0, 0, 0)
 
         R = charge * R  # both polarities
-        alpha = 2*np.arcsin(Rc / 2 / R)
+        alpha = 2*np.arcsin(Rtmp / 2 / R)
 
         if (alpha > np.pi):
             return (0, 0, 0)  # algorithm doesn't work for spinning tracks
@@ -82,8 +90,8 @@ class SPDEventGenerator:
         if extphi < 0:
             extphi = extphi + 2 * np.pi
 
-        x = Rc * np.cos(extphi)
-        y = Rc * np.sin(extphi)
+        x = vx + Rtmp * np.cos(extphi)
+        y = vy + Rtmp * np.sin(extphi)
 
         radial = np.array([x - x0*charge, y - y0*charge], dtype=np.float32)
 
@@ -94,7 +102,7 @@ class SPDEventGenerator:
         tangent *= -pt * charge
         px, py = tangent[0], tangent[1]
 
-        z = z0 + k0 * alpha
+        z = vz + k0 * alpha
         return (x, y, z, px, py, pz)
 
     def generate_track_hits(
@@ -116,7 +124,15 @@ class SPDEventGenerator:
 
         for _, r in enumerate(radii):
             x, y, z, px, py, pz = self.extrapolate_to_r(
-                pt, charge, theta, phi, vz, r)
+                pt=pt,
+                charge=charge,
+                theta=theta,
+                phi=phi,
+                vx=vx,
+                vy=vy,
+                vz=vz,
+                Rc=r,
+            )
 
             if (x, y, z) == (0, 0, 0):
                 continue
@@ -213,13 +229,14 @@ class SPDEventGenerator:
                 radii=radii
             )
 
-        return {
-            "hits": hits,
-            "missing_hits_mask": missing_hits_mask,
-            "momentums": momentums,
-            "track_ids": track_ids,
-            "fakes": fakes
-        }
+        return Event(
+            hits=hits,
+            missing_hits_mask=missing_hits_mask,
+            momentums=momentums,
+            fakes=fakes,
+            track_ids=track_ids,
+            vertex=np.array([vx, vy, vz], dtype=np.float32)
+        )
 
     def generate_time_slice(
         self,
@@ -241,12 +258,15 @@ class SPDEventGenerator:
         momentums = []
         track_ids = []
         event_ids = []
+        vertices = []
         fakes = []
         n_gen_tracks = 0
 
         # either use fixed number of events or generate from poisson distribution
         n_events = mean_events if fixed_num_events else np.random.poisson(
             mean_events)
+        # at least one event should be generated
+        n_events = max(n_events, 1)
 
         for event_id in range(0, n_events):
             event = self.generate_spd_event(
@@ -255,27 +275,30 @@ class SPDEventGenerator:
             if event_id != 0:
                 # update track labels according to the number of
                 # previously generated tracks
-                event["track_ids"] += n_gen_tracks
+                event.track_ids += n_gen_tracks
 
-            hits.append(event["hits"])
-            momentums.append(event["momentums"])
-            fakes.append(event["fakes"])
-            track_ids.append(event["track_ids"])
-            event_ids.append(np.full(len(event["hits"]), event_id))
-            n_gen_tracks += np.unique(event["track_ids"]).size
+            hits.append(event.hits)
+            momentums.append(event.momentums)
+            vertices.append(event.vertex)
+            fakes.append(event.fakes)
+            track_ids.append(event.track_ids)
+            event_ids.append(np.full(len(event.hits), event_id))
+            n_gen_tracks += np.unique(event.track_ids).size
 
         hits = np.vstack(hits)
         missing_hits_mask = ~hits.any(axis=1)
         momentums = np.vstack(momentums)
+        vertices = np.vstack(vertices)
         track_ids = np.concatenate(track_ids)
         event_ids = np.concatenate(event_ids)
         fakes = np.vstack(fakes)
 
-        return {
-            "hits": hits,
-            "missing_hits_mask": missing_hits_mask,
-            "momentums": momentums,
-            "track_ids": track_ids,
-            "event_ids": event_ids,
-            "fakes": fakes
-        }
+        return TimeSlice(
+            hits=hits,
+            missing_hits_mask=missing_hits_mask,
+            momentums=momentums,
+            track_ids=track_ids,
+            event_ids=event_ids,
+            fakes=fakes,
+            vertices=vertices
+        )
