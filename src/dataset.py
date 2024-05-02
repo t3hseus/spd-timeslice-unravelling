@@ -22,12 +22,14 @@ class SPDTimesliceTracksDataset(Dataset):
         self,
         n_samples: int = 100,
         detector_eff: float = 0.98,
-        n_events_timeslice: int = 40,
+        mean_events_timeslice: int = 30,
+        fixed_num_events: bool = False,
         hits_normalizer: Optional[Callable] = None,
         mode: DatasetMode = DatasetMode.train
     ):
         self.spd_gen = SPDEventGenerator(
-            n_events_timeslice=n_events_timeslice,
+            mean_events_timeslice=mean_events_timeslice,
+            fixed_num_events=fixed_num_events,
             detector_eff=detector_eff,
             add_fakes=False
         )
@@ -62,4 +64,3 @@ class SPDTimesliceTracksDataset(Dataset):
         labels = torch.tensor(
             time_slice["event_ids"][np.cumsum(uniq_track_ids_counts)-1])
         return tracks, labels
-

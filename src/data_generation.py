@@ -27,7 +27,8 @@ class SPDEventGenerator:
         detector_eff: float = 1.0,
         add_fakes: bool = True,
         n_stations: int = 35,
-        n_events_timeslice: int = 40,
+        mean_events_timeslice: int = 30,
+        fixed_num_events: bool = False,
         vx_range: Tuple[float, float] = (0.0, 10.0),
         vy_range: Tuple[float, float] = (0.0, 10.0),
         vz_range: Tuple[float, float] = (-300.0, 300.),
@@ -39,7 +40,8 @@ class SPDEventGenerator:
         self.detector_eff = detector_eff
         self.add_fakes = add_fakes
         self.n_stations = n_stations
-        self.n_events_timeslice = n_events_timeslice
+        self.mean_events_timeslice = mean_events_timeslice
+        self.fixed_num_events = fixed_num_events
         self.vx_range = vx_range
         self.vy_range = vy_range
         self.vz_range = vz_range
@@ -221,16 +223,19 @@ class SPDEventGenerator:
 
     def generate_time_slice(
         self,
-        n_events: Optional[int] = None,
+        mean_events: Optional[int] = None,
+        fixed_num_events: bool = False,
         detector_eff: Optional[float] = None,
         add_fakes: Optional[bool] = None,
     ) -> TimeSlice:
-        if n_events is None:
-            n_events = self.n_events_timeslice
+        if mean_events is None:
+            mean_events = self.mean_events_timeslice
         if detector_eff is None:
             detector_eff = self.detector_eff
         if add_fakes is None:
             add_fakes = self.add_fakes
+        # check if one of parameters is True
+        fixed_num_events = fixed_num_events | self.fixed_num_events
 
         hits = []
         momentums = []
@@ -238,6 +243,10 @@ class SPDEventGenerator:
         event_ids = []
         fakes = []
         n_gen_tracks = 0
+
+        # either use fixed number of events or generate from poisson distribution
+        n_events = mean_events if fixed_num_events else np.random.poisson(
+            mean_events)
 
         for event_id in range(0, n_events):
             event = self.generate_spd_event(
