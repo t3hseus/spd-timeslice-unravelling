@@ -22,12 +22,14 @@ class SPDTimesliceTracksDataset(Dataset):
         self,
         n_samples: int = 100,
         detector_eff: float = 0.98,
-        n_events_timeslice: int = 40,
+        mean_events_timeslice: int = 30,
+        fixed_num_events: bool = False,
         hits_normalizer: Optional[Callable] = None,
         mode: DatasetMode = DatasetMode.train
     ):
         self.spd_gen = SPDEventGenerator(
-            n_events_timeslice=n_events_timeslice,
+            mean_events_timeslice=mean_events_timeslice,
+            fixed_num_events=fixed_num_events,
             detector_eff=detector_eff,
             add_fakes=False
         )
@@ -46,20 +48,19 @@ class SPDTimesliceTracksDataset(Dataset):
         # generate sample
         time_slice = self.spd_gen.generate_time_slice()
         _, uniq_track_ids_counts = np.unique(
-            time_slice["track_ids"], return_counts=True)
+            time_slice.track_ids, return_counts=True)
 
         if self.hits_normalizer:
-            time_slice["hits"] = self.hits_normalizer(time_slice["hits"])
+            time_slice.hits = self.hits_normalizer(time_slice.hits)
 
         # split hits array by tracks and convert to tensors
         tracks_by_hits = torch.split(
-            torch.tensor(time_slice["hits"]).reshape(-1),
+            torch.tensor(time_slice.hits).reshape(-1),
             (uniq_track_ids_counts*3).tolist()
         )
         # pad short tracks by zeros and create single matrix N_tracks x N_stations*3
         tracks = pad_sequence(tracks_by_hits).T
         # create event label for each track
         labels = torch.tensor(
-            time_slice["event_ids"][np.cumsum(uniq_track_ids_counts)-1])
+            time_slice.event_ids[np.cumsum(uniq_track_ids_counts)-1])
         return tracks, labels
-
