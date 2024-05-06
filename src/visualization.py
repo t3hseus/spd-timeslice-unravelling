@@ -1,7 +1,9 @@
 import io
+import os
 import numpy as np
 import plotly.graph_objects as go
 import matplotlib.pyplot as plt
+from plotly.express.colors import sample_colorscale
 from typing import Optional, Any, Tuple
 from cycler import cycler
 
@@ -9,22 +11,44 @@ from cycler import cycler
 def draw_events(
     hits: np.ndarray[(Any, 3), np.float32],
     labels: np.ndarray[Any, np.int32],
+    vertices: Optional[np.ndarray[(Any, 3), np.float32]] = None,
     fakes: Optional[np.ndarray[(Any, 3), np.float32]] = None,
     x_coord_range: Tuple[float, float] = (-851., 851.),
     y_coord_range: Tuple[float, float] = (-851., 851.),
-    z_coord_range: Tuple[float, float] = (-2386., 2386.)
+    z_coord_range: Tuple[float, float] = (-2386., 2386.),
+    colorscale: str = "Plotly3"
 ) -> go.Figure:
-    fig = go.Figure(data=go.Scatter3d(
-        x=hits[:, 0],
-        y=hits[:, 1],
-        z=hits[:, 2],
-        marker=dict(
-            size=1,
-            color="green",
-        ),
-        mode='markers',
-        name='tracks',
-    ))
+
+    fig = go.Figure()
+    uniq_labels = np.unique(labels)
+    colors = sample_colorscale(colorscale, uniq_labels / uniq_labels.max())
+
+    for i, label in enumerate(uniq_labels):
+        event_hits = hits[labels == label]
+        fig.add_trace(go.Scatter3d(
+            x=event_hits[:, 0],
+            y=event_hits[:, 1],
+            z=event_hits[:, 2],
+            marker=dict(
+                size=1,
+                color=colors[i],
+            ),
+            mode="markers",
+            name=f"Event #{label}"
+        ))
+
+    if vertices is not None:
+        fig.add_trace(go.Scatter3d(
+            x=vertices[:, 0],
+            y=vertices[:, 1],
+            z=vertices[:, 2],
+            marker=dict(
+                size=2,
+                color=colors,
+            ),
+            mode="markers",
+            name="Vertices"
+        ))
 
     if fakes is not None:
         fig.add_trace(go.Scatter3d(
@@ -37,7 +61,7 @@ def draw_events(
             ),
             opacity=0.35,
             mode='markers',
-            name='fakes',
+            name='Fakes',
         ))
 
     fig.update_layout(
@@ -85,3 +109,24 @@ def draw_embeddings(
     # plt.savefig(buf, format='png')
     # buf.seek(0)
     return plt
+
+
+def visualize_embeddings_eval(
+        ax,
+        embeddings: np.ndarray,
+        labels: np.ndarray,
+        sample_idx: int,
+        split_name: str
+):
+    label_set = np.unique(labels)
+    num_classes = len(label_set)
+    ax.set_prop_cycle(
+        cycler(
+            "color", [plt.cm.nipy_spectral(i)
+                      for i in np.linspace(0, 0.9, num_classes)]
+        )
+    )
+    for i in range(num_classes):
+        idx = labels == label_set[i]
+        ax.plot(embeddings[idx, 0], embeddings[idx, 1], ".", markersize=5)
+    ax.set_title(f"UMAP plot for the #{sample_idx} {split_name} sample")
