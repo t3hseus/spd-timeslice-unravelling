@@ -24,16 +24,16 @@ class Clustering:
         return cluster_assignments
 
     @staticmethod
-    def cluster_formating(cluster_list):
+    def cluster_formating(cluster_list: np.ndarray):
         """
         formatting
         [0, 1, 1, 2, 2, 2, 3, 3]
         to
         true_clusters = {
-            1: [11, 12, 13, 14],
-            2: [21, 22, 23, 24],
-            3: [31, 32, 33, 34],
-            4: [41, 42],
+            1: [0],
+            2: [1, 2],
+            3: [3, 4, 5],
+            4: [6, 7],
         }
         """
         clusters_formatted = defaultdict(list)
@@ -71,9 +71,6 @@ class Clustering:
 
     @staticmethod
     def link_cluster_hungarian_method(true_clusters: dict, predicted_clusters: dict):
-        '''
-        cluster should be formatted in dict format!
-        '''
 
         intersection_matrix = np.zeros((len(true_clusters), len(predicted_clusters)))
 
@@ -88,7 +85,7 @@ class Clustering:
         return matching_result
 
     @staticmethod
-    def prepare_labels_for_metrics(true_clusters, predicted_clusters, matching_result):
+    def prepare_labels_for_metrics(true_clusters: dict, predicted_clusters: dict, matching_result: dict):
 
         true_labels = []
         pred_labels = []
