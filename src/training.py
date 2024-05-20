@@ -55,7 +55,7 @@ class TripletTracksEmbedder(pl.LightningModule):
         metrics: Optional[list] = None,
     ):
         super().__init__()
-        self.save_hyperparameters(ignore=['model', 'umapper', 'clustering_algorithm'])
+        # self.save_hyperparameters(ignore=['model', 'umapper', 'clustering_algorithm'])
 
         if umapper is None:
             # configure default one
