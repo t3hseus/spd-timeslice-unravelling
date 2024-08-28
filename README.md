@@ -13,11 +13,12 @@ conda activate spd_triplet_embedder
 make train
 ```
 
+### 3. Evaluate the model
+```bash
+make eval MODEL_DIR="./experiment_logs/TrackEmbedder/version_0"
+```
+
 To check Tensorboard logs:
 ```bash
 tensorboard --logdir experiment_logs
 ```
-
-
-
-

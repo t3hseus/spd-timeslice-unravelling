@@ -1,7 +1,6 @@
 
 import os
 import time
-import importlib
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
@@ -12,14 +11,13 @@ from glob import glob
 from torch import nn
 from typing import Optional, Any, Callable
 
-from src.clustering import Clustering
-from src.dataset import time_slice_collator, SPDTimesliceTracksDataset, DatasetMode
+from .clustering import Clustering
+from .dataset import time_slice_collator, SPDTimesliceTracksDataset, DatasetMode
 from torch.utils.data import DataLoader
-from src.visualization import visualize_embeddings_eval
-from src.metrics import *
-from src.clustering import Clustering
+from .visualization import visualize_embeddings_eval
+from .metrics import *
 
-
+from sklearn.metrics import f1_score, precision_score, recall_score
 BATCH_SIZE = 1
 
 
@@ -109,11 +107,13 @@ class ModelEvaluator:
             end_time = time.time()
             embedding_times.append(end_time - start_time)
 
-            emb_np = embeddings.detach().numpy()
-            evt_ids_np = evt_ids.detach().numpy()
+            emb_np = embeddings.detach().numpy() # embeddings
+            evt_ids_np = evt_ids.detach().numpy() # clust numbers
+
             start_time = time.time()
-            cluster_preds = self.clustering.cluster_and_link(
-                emb_np, evt_ids_np)
+            evt_ids_np_prep, cluster_preds, cluster_assignments = self.clustering.cluster_and_link(
+                emb_np, evt_ids_np) # true and preds labels
+
             end_time = time.time()
             clustering_times.append(end_time - start_time)
 
@@ -124,9 +124,9 @@ class ModelEvaluator:
                     RecallScoreMetric,
                     AccuracyScoreMetric
                 )):
-                    metric.update(evt_ids_np, cluster_preds)
+                    metric.update(evt_ids_np_prep, cluster_preds)
                 elif isinstance(metric, BaseScoreMetric):
-                    metric.update(emb_np, cluster_preds)
+                    metric.update(emb_np, cluster_assignments)
 
         avg_embedding_time = np.mean(embedding_times)
         std_embedding_time = np.std(embedding_times)
@@ -148,7 +148,7 @@ class ModelEvaluator:
 
         if save_result:
             with open(os.path.join(self.model_dir, "eval_res.json"), "w") as f:
-                json.dump(results, f)
+                json.dump(results, f, indent=4)
             # TODO: add here visualize embeddings
 
         return results

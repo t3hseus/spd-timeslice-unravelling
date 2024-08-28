@@ -55,7 +55,7 @@ class TripletTracksEmbedder(pl.LightningModule):
         metrics: Optional[list] = None,
     ):
         super().__init__()
-        self.save_hyperparameters(ignore=['model', 'umapper', 'clustering_algorithm'])
+        # self.save_hyperparameters(ignore=['model', 'umapper', 'clustering_algorithm'])
 
         if umapper is None:
             # configure default one
@@ -115,7 +115,9 @@ class TripletTracksEmbedder(pl.LightningModule):
         loss, embeddings = self._forward_batch(batch, return_embeddings=True)
         emb_np = embeddings.cpu().detach().numpy()
         evt_ids_np = batch[1].cpu().numpy()
-        cluster_preds = self.clustering.cluster_and_link(emb_np, evt_ids_np)
+
+        evt_ids_np_prep, cluster_preds, cluster_assignments = self.clustering.cluster_and_link(
+                emb_np, evt_ids_np)
 
         metrics_results = {}
 
@@ -126,9 +128,9 @@ class TripletTracksEmbedder(pl.LightningModule):
                 RecallScoreMetric,
                 AccuracyScoreMetric
             )):
-                metric.update(evt_ids_np, cluster_preds)
+                metric.update(evt_ids_np_prep, cluster_preds)
             elif isinstance(metric, BaseScoreMetric):
-                metric.update(emb_np, cluster_preds)
+                metric.update(emb_np, cluster_assignments)
 
         self.validation_step_outputs.append({
             "embeddings": emb_np,
